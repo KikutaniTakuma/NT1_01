@@ -20,39 +20,22 @@ int main() {
 			
 			throw std::runtime_error("WinSock initialize failed");
 		}
-
-		std::cout << "ポート番号の入力 : ";
-
-		uint32_t uport = 0;
-		std::cin >> uport;
 		
 		// ソケット作成
-		SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
+		SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
 		if (s == INVALID_SOCKET) {
 			throw std::runtime_error("Create socket failed");
 		}
 
-		std::string szServer;
-		szServer.resize(256);
-		szServer = "192.168.0.60";
 
-		HOSTENT* lpHost = nullptr;
-		lpHost = gethostbyname(szServer.data());
+		sockaddr_in send_addr;
+		memset(&send_addr, 0, sizeof(send_addr));
+		send_addr.sin_family = AF_INET;
+		send_addr.sin_port = htons(8000);
+		send_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-
-		SOCKADDR_IN saddr;
-		memset(&saddr, 0, sizeof(saddr));
-		saddr.sin_family = lpHost->h_addrtype;
-		saddr.sin_port = htons(uport);
-		saddr.sin_addr.s_addr = *((u_long*)lpHost->h_addr);
-
-		if (connect(s, reinterpret_cast<SOCKADDR*>(&saddr), sizeof(saddr)) == SOCKET_ERROR) {
-			closesocket(s);
-			throw std::runtime_error("server conectted faile");
-		}
-		else {
-			std::cout << "接続成功" << std::endl;
-		}
+		sockaddr_in recv_addr;
+		int fromlen = sizeof(recv_addr);
 
 		while (1) {
 			int32_t nRcv;
@@ -63,7 +46,7 @@ int main() {
 			std::cout << "送信 -->";
 			std::cin >> szBuf;
 
-			send(s, szBuf.data(), static_cast<int32_t>(szBuf.size()), 0);
+			sendto(s, szBuf.data(), static_cast<int32_t>(szBuf.size()), 0, reinterpret_cast<const sockaddr*>(&send_addr), sizeof(send_addr));
 			if (szBuf == "end") {
 				break;
 			}
@@ -73,7 +56,8 @@ int main() {
 
 			std::cout << "受信待機中" << std::endl;
 
-			nRcv = recv(s, szBuf.data(), static_cast<int32_t>(szBuf.size()) - 1, 0);
+			nRcv = recvfrom(s, szBuf.data(), static_cast<int32_t>(szBuf.size()) - 1, 0, reinterpret_cast<struct sockaddr*>(&recv_addr), &fromlen);
+			
 			szBuf[nRcv] = '\0';
 			std::cout << "受信 -->" << szBuf << std::endl;
 			if (szBuf == "end") {
@@ -86,7 +70,7 @@ int main() {
 		WSACleanup();
 	}
 	catch (const std::exception& err) {
-		std::cout << err.what() << std::endl;
+		std::cerr << err.what() << std::endl;
 		return 1;
 	}
 
